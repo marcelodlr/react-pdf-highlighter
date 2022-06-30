@@ -5,6 +5,13 @@
   opacity: 1;
   mix-blend-mode: multiply;
 }
+.Highlight__part {
+  height: 21px;
+}
+
+/* .textLayer > span {
+  height: 200px;
+} */
 
 .annotationLayer {
   position: absolute;
@@ -27,15 +34,21 @@ html
 }
 
 @media all and (-ms-high-contrast: none), (-ms-high-contrast: active) {
-  .textLayer {opacity: 0.5;}
+  .textLayer {
+    opacity: 0.5;
+  }
 }
 
 /* Internet Explorer support method */
 @media all and (-ms-high-contrast: none), (-ms-high-contrast: active) {
-  .textLayer {opacity: 0.5 }
+  .textLayer {
+    opacity: 0.5;
+  }
 }
 
 /* Microsoft Edge Browser 12+ (All) - @supports method */
-@supports (-ms-ime-align:auto) {
-  .textLayer {opacity: 0.5 }
+@supports (-ms-ime-align: auto) {
+  .textLayer {
+    opacity: 0.5;
+  }
 }

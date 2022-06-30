@@ -185,6 +185,7 @@ export class PdfHighlighter<T_HT extends IHighlight> extends PureComponent<
         enhanceTextSelection: true,
         removePageBorders: true,
         linkService: this.linkService,
+        textLayerMode: 2,
       });
 
     this.linkService.setDocument(pdfDocument);
@@ -546,7 +547,6 @@ export class PdfHighlighter<T_HT extends IHighlight> extends PureComponent<
     const { onSelectionFinished } = this.props;
 
     const { isCollapsed, range } = this.state;
-
     if (!range || isCollapsed) {
       return;
     }
