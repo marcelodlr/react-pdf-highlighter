@@ -29,6 +29,7 @@ const measureText = (
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d", { alpha: false });
   if (ctx) {
+    console.log(el.textContent?.substring(startOffset, endOffset));
     ctx.font = `${el.style.fontSize} ${el.style.fontFamily}`;
     const { width } = ctx.measureText(
       el.textContent?.substring(startOffset, endOffset) || ""
@@ -45,6 +46,7 @@ const getAllSpansInRange = (range: Range): HTMLElement[] => {
       ? range.startContainer
       : range.startContainer.parentNode
   ) as HTMLElement;
+
   const lastNode = (
     range.endContainer.nodeName === "SPAN"
       ? range.endContainer
@@ -71,6 +73,50 @@ const getAllSpansInRange = (range: Range): HTMLElement[] => {
   return spans;
 };
 
+const fromPxToNumber = (px: string) => Number(px.replace("px", "") || 0);
+
+type LeftAndWidthBounds = {
+  left: number;
+  width: number;
+};
+interface Options {
+  initialValues: LeftAndWidthBounds;
+  scale: number;
+}
+
+/**
+ * the width and left would be different in 3 cases:
+ * 1) there is only one span, causing it to be first and last at the same time, we should adjust width and left
+ * 2) the first span which the selection might not include all of it's contents, we adjust width and left of it.
+ * 3) the last span which the selection might not include all of it's contents, we adjust width of it.
+ * */
+const calcWidthAndLeftBounds = (
+  spans: HTMLElement[],
+  span: HTMLElement,
+  range: Range,
+  { initialValues, scale }: Options
+): LeftAndWidthBounds => {
+  const bounds = {
+    left: initialValues.left,
+    width: initialValues.width,
+  };
+  if (spans.indexOf(span) === 0 && spans.indexOf(span) === spans.length - 1) {
+    const selectedTextWidth =
+      measureText(span, range.startOffset, range.endOffset) * scale;
+    const endTextWidth = measureText(span, range.endOffset) * scale;
+    bounds.left = bounds.left + bounds.width - selectedTextWidth - endTextWidth;
+    bounds.width = selectedTextWidth;
+  } else if (spans.indexOf(span) === 0) {
+    const selectedTextWidth = measureText(span, range.startOffset) * scale;
+    bounds.left = bounds.left + bounds.width - selectedTextWidth;
+    bounds.width = selectedTextWidth;
+  } else if (spans.indexOf(span) === spans.length - 1) {
+    bounds.width = measureText(span, 0, range.endOffset) * scale;
+  }
+
+  return bounds;
+};
+
 const getClientRects = (
   range: Range,
   pages: Page[],
@@ -81,36 +127,26 @@ const getClientRects = (
 
   for (const span of spans) {
     for (const page of pages) {
-      const pageRect = page.node.getBoundingClientRect();
-      const clientRect = span.getBoundingClientRect();
-      if (isClientRectInsidePageRect(clientRect, pageRect)) {
-        const measuredWidth = measureText(span, 0);
-        // span width might differ from the measured one, so we adjust with the correct proportion.
-        const widthTransformFix = clientRect.width / measuredWidth;
-        let width = clientRect.width;
-        let left = clientRect.left;
+      const styles = getComputedStyle(span);
 
-        // first and last spans might have an offset, which is calculated by the range offset
-        if (spans.indexOf(span) === 0) {
-          const selectedTextWidth =
-            measureText(span, range.startOffset) * widthTransformFix;
-          left = left + width - selectedTextWidth;
-          width = selectedTextWidth;
-        }
+      // PDF.js applies a scaleX that it's no automatically aplied to styles.width, we need to adjust that.
+      const spanScaleX = new WebKitCSSMatrix(styles.transform).a;
+      let initialWidth = spanScaleX * fromPxToNumber(styles.width);
+      let initialLeft = fromPxToNumber(styles.left);
 
-        if (spans.indexOf(span) === spans.length - 1) {
-          width = measureText(span, 0, range.endOffset) * widthTransformFix;
-        }
+      const { width, left } = calcWidthAndLeftBounds(spans, span, range, {
+        initialValues: { width: initialWidth, left: initialLeft },
+        scale: spanScaleX,
+      });
 
-        const highlightedRect = {
-          top: clientRect.top + page.node.scrollTop - pageRect.top,
-          left: left + page.node.scrollLeft - pageRect.left,
-          width: width,
-          height: clientRect.height,
-          pageNumber: page.number,
-        } as LTWHP;
-        rects.push(highlightedRect);
-      }
+      const highlightedRect = {
+        top: fromPxToNumber(styles.top),
+        left: left,
+        width: width,
+        height: fromPxToNumber(styles.height),
+        pageNumber: page.number,
+      } as LTWHP;
+      rects.push(highlightedRect);
     }
   }
 
